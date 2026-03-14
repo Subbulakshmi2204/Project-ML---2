@@ -6,32 +6,27 @@ from sklearn.cluster import KMeans, DBSCAN, AgglomerativeClustering
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 
-# Page configuration
-st.set_page_config(
-    page_title="Urban Mobility Clustering Dashboard",
-    page_icon="🚦",
-    layout="wide"
-)
+st.set_page_config(page_title="Urban Mobility Clustering", layout="wide")
 
 st.title("🚦 Urban Mobility Pattern Discovery")
-st.markdown("Analyze transportation behavior using clustering algorithms.")
 
 # Load dataset
 data = pd.read_csv("mobility_data.csv")
 
-# Sidebar controls
-st.sidebar.header("Clustering Settings")
-
-k_clusters = st.sidebar.slider("Select number of clusters for KMeans", 2, 6, 3)
-
-# Dataset preview
-st.subheader("Dataset Preview")
+# Show dataset
+st.subheader("Dataset")
 st.dataframe(data)
 
-# Feature selection
+# Convert all columns to numeric
+data = data.apply(pd.to_numeric, errors='coerce')
+
+# Remove rows with missing values
+data = data.dropna()
+
+# Select features
 X = data[['travel_time','distance_km','trip_frequency','vehicle_type']]
 
-# Scaling
+# Scale data
 scaler = StandardScaler()
 X_scaled = scaler.fit_transform(X)
 
@@ -39,88 +34,35 @@ X_scaled = scaler.fit_transform(X)
 pca = PCA(n_components=2)
 X_pca = pca.fit_transform(X_scaled)
 
-# Metrics
-col1, col2, col3 = st.columns(3)
+# KMeans
+st.subheader("KMeans Clustering")
 
-col1.metric("Total Trips", len(data))
-col2.metric("Average Distance", round(data["distance_km"].mean(),2))
-col3.metric("Average Travel Time", round(data["travel_time"].mean(),2))
+kmeans = KMeans(n_clusters=3, random_state=42)
+k_labels = kmeans.fit_predict(X_scaled)
 
-# Tabs for algorithms
-tab1, tab2, tab3 = st.tabs(["K-Means Clustering","DBSCAN Clustering","Hierarchical Clustering"])
+fig1, ax1 = plt.subplots()
+ax1.scatter(X_pca[:,0], X_pca[:,1], c=k_labels, cmap="viridis")
+ax1.set_title("KMeans Clusters")
+st.pyplot(fig1)
 
-# ---------------- KMeans ----------------
+# DBSCAN
+st.subheader("DBSCAN Clustering")
 
-with tab1:
+dbscan = DBSCAN(eps=1.5, min_samples=2)
+d_labels = dbscan.fit_predict(X_scaled)
 
-    st.subheader("K-Means Clustering")
+fig2, ax2 = plt.subplots()
+ax2.scatter(X_pca[:,0], X_pca[:,1], c=d_labels, cmap="plasma")
+ax2.set_title("DBSCAN Clusters")
+st.pyplot(fig2)
 
-    kmeans = KMeans(n_clusters=k_clusters, random_state=42)
-    labels = kmeans.fit_predict(X_scaled)
+# Hierarchical
+st.subheader("Hierarchical Clustering")
 
-    fig, ax = plt.subplots()
+hier = AgglomerativeClustering(n_clusters=3)
+h_labels = hier.fit_predict(X_scaled)
 
-    scatter = ax.scatter(
-        X_pca[:,0],
-        X_pca[:,1],
-        c=labels,
-        cmap="viridis"
-    )
-
-    ax.set_xlabel("PCA Component 1")
-    ax.set_ylabel("PCA Component 2")
-    ax.set_title("K-Means Clustering Visualization")
-
-    st.pyplot(fig)
-
-# ---------------- DBSCAN ----------------
-
-with tab2:
-
-    st.subheader("DBSCAN Clustering")
-
-    dbscan = DBSCAN(eps=1.5, min_samples=2)
-    labels = dbscan.fit_predict(X_scaled)
-
-    fig, ax = plt.subplots()
-
-    scatter = ax.scatter(
-        X_pca[:,0],
-        X_pca[:,1],
-        c=labels,
-        cmap="plasma"
-    )
-
-    ax.set_xlabel("PCA Component 1")
-    ax.set_ylabel("PCA Component 2")
-    ax.set_title("DBSCAN Clustering Visualization")
-
-    st.pyplot(fig)
-
-# ---------------- Hierarchical ----------------
-
-with tab3:
-
-    st.subheader("Hierarchical Clustering")
-
-    hierarchical = AgglomerativeClustering(n_clusters=3)
-    labels = hierarchical.fit_predict(X_scaled)
-
-    fig, ax = plt.subplots()
-
-    scatter = ax.scatter(
-        X_pca[:,0],
-        X_pca[:,1],
-        c=labels,
-        cmap="rainbow"
-    )
-
-    ax.set_xlabel("PCA Component 1")
-    ax.set_ylabel("PCA Component 2")
-    ax.set_title("Hierarchical Clustering Visualization")
-
-    st.pyplot(fig)
-
-# Footer
-st.markdown("---")
-st.markdown("Machine Learning Mini Project | Clustering & Dimensionality Reduction")
+fig3, ax3 = plt.subplots()
+ax3.scatter(X_pca[:,0], X_pca[:,1], c=h_labels, cmap="rainbow")
+ax3.set_title("Hierarchical Clusters")
+st.pyplot(fig3)
