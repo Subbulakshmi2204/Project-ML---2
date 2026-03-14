@@ -2,145 +2,101 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from sklearn.cluster import KMeans, DBSCAN, AgglomerativeClustering
+from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 
-# Page setup
-st.set_page_config(page_title="Urban Mobility Clustering Dashboard", layout="wide")
+# Page configuration
+st.set_page_config(page_title="Urban Mobility Insights", layout="wide")
 
-st.title("🚦 Urban Mobility Pattern Discovery using Clustering")
+st.title("🚦 Urban Mobility Pattern Analysis")
 
 st.markdown("""
-This dashboard analyzes **urban travel patterns** using Machine Learning clustering algorithms.
+This app analyzes **urban travel behavior** using Machine Learning clustering.
 
-Algorithms used:
-- K-Means Clustering
-- DBSCAN
-- Hierarchical Clustering
-- PCA for dimensionality reduction
+It groups travelers based on:
+- Travel Time
+- Travel Distance
+- Trip Frequency
+- Vehicle Type
 """)
 
 # Load dataset
 data = pd.read_csv("mobility_data.csv")
 
-st.subheader("Dataset Preview")
-st.dataframe(data)
-
 # Convert to numeric
 data = data.apply(pd.to_numeric, errors='coerce')
-
-# Remove missing values
 data = data.dropna()
 
-# Feature selection
+# Features
 X = data[['travel_time','distance_km','trip_frequency','vehicle_type']]
 
 # Scale data
 scaler = StandardScaler()
 X_scaled = scaler.fit_transform(X)
 
-# PCA reduction
+# Sidebar control
+st.sidebar.header("Settings")
+k = st.sidebar.slider("Select number of mobility groups", 2, 5, 3)
+
+# KMeans clustering
+kmeans = KMeans(n_clusters=k, random_state=42)
+data['Cluster'] = kmeans.fit_predict(X_scaled)
+
+# PCA for visualization
 pca = PCA(n_components=2)
 X_pca = pca.fit_transform(X_scaled)
 
-# Sidebar settings
-st.sidebar.header("Clustering Settings")
-k_clusters = st.sidebar.slider("Select number of clusters (KMeans)", 2, 5, 3)
+# ------------------ DATA OVERVIEW ------------------
 
-# ---------------- KMEANS ----------------
+st.header("📊 Dataset Overview")
 
-st.header("K-Means Clustering")
+col1, col2, col3 = st.columns(3)
 
-kmeans = KMeans(n_clusters=k_clusters, random_state=42)
-data['KMeans_Cluster'] = kmeans.fit_predict(X_scaled)
+col1.metric("Total Trips", len(data))
+col2.metric("Average Distance", round(data['distance_km'].mean(),2))
+col3.metric("Average Travel Time", round(data['travel_time'].mean(),2))
 
-st.subheader("Cluster Assignment Table")
-st.dataframe(data)
+# ------------------ CLUSTER VISUALIZATION ------------------
 
-# Cluster summary
-st.subheader("Cluster Summary")
+st.header("📍 Travel Pattern Groups")
 
-cluster_summary = data.groupby("KMeans_Cluster").mean()
+fig, ax = plt.subplots()
 
-st.dataframe(cluster_summary)
-
-# PCA visualization
-fig1, ax1 = plt.subplots()
-
-scatter = ax1.scatter(
+scatter = ax.scatter(
     X_pca[:,0],
     X_pca[:,1],
-    c=data['KMeans_Cluster'],
-    cmap="viridis"
+    c=data['Cluster'],
 )
 
-ax1.set_xlabel("PCA Component 1")
-ax1.set_ylabel("PCA Component 2")
-ax1.set_title("K-Means Cluster Visualization")
+ax.set_xlabel("Mobility Pattern 1")
+ax.set_ylabel("Mobility Pattern 2")
+ax.set_title("Traveler Groups Based on Similar Behavior")
 
-st.pyplot(fig1)
+st.pyplot(fig)
 
-# Bar chart for cluster distance
-st.subheader("Average Travel Distance per Cluster")
+# ------------------ CLUSTER INTERPRETATION ------------------
 
-fig2, ax2 = plt.subplots()
+st.header("🧠 What These Groups Mean")
 
-cluster_summary['distance_km'].plot(kind='bar', ax=ax2)
+summary = data.groupby("Cluster").mean()
 
-ax2.set_ylabel("Distance (km)")
-ax2.set_title("Cluster Comparison")
+for i in summary.index:
 
-st.pyplot(fig2)
+    st.subheader(f"Group {i}")
 
-# ---------------- DBSCAN ----------------
+    st.write(
+        f"""
+        • Average Travel Time: **{round(summary.loc[i,'travel_time'],2)} minutes**  
+        • Average Distance: **{round(summary.loc[i,'distance_km'],2)} km**  
+        • Trip Frequency: **{round(summary.loc[i,'trip_frequency'],2)} trips**
+        """
+    )
 
-st.header("DBSCAN Clustering")
+# ------------------ DATA VIEW ------------------
 
-dbscan = DBSCAN(eps=1.5, min_samples=2)
+with st.expander("View Full Dataset"):
+    st.dataframe(data)
 
-data['DBSCAN_Cluster'] = dbscan.fit_predict(X_scaled)
-
-st.write("Cluster labels (-1 represents outliers)")
-
-st.dataframe(data[['travel_time','distance_km','trip_frequency','vehicle_type','DBSCAN_Cluster']])
-
-fig3, ax3 = plt.subplots()
-
-ax3.scatter(
-    X_pca[:,0],
-    X_pca[:,1],
-    c=data['DBSCAN_Cluster'],
-    cmap="plasma"
-)
-
-ax3.set_title("DBSCAN Cluster Visualization")
-
-st.pyplot(fig3)
-
-# ---------------- HIERARCHICAL ----------------
-
-st.header("Hierarchical Clustering")
-
-hier = AgglomerativeClustering(n_clusters=3)
-
-data['Hierarchical_Cluster'] = hier.fit_predict(X_scaled)
-
-st.dataframe(data[['travel_time','distance_km','trip_frequency','vehicle_type','Hierarchical_Cluster']])
-
-fig4, ax4 = plt.subplots()
-
-ax4.scatter(
-    X_pca[:,0],
-    X_pca[:,1],
-    c=data['Hierarchical_Cluster'],
-    cmap="rainbow"
-)
-
-ax4.set_title("Hierarchical Cluster Visualization")
-
-st.pyplot(fig4)
-
-# Footer
 st.markdown("---")
-st.markdown("Machine Learning Mini Project | Clustering & Dimensionality Reduction")
+st.caption("Machine Learning Mini Project – Clustering & Dimensionality Reduction")
